@@ -4,7 +4,8 @@ import (
 	"database/sql"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/mattermost/focalboard/server/services/mlog"
+
+	"github.com/mattermost/mattermost-server/v6/shared/mlog"
 )
 
 const (
@@ -19,37 +20,24 @@ type SQLStore struct {
 	dbType           string
 	tablePrefix      string
 	connectionString string
+	isPlugin         bool
 	logger           *mlog.Logger
 }
 
 // New creates a new SQL implementation of the store.
-func New(dbType, connectionString string, tablePrefix string, logger *mlog.Logger) (*SQLStore, error) {
+func New(dbType, connectionString, tablePrefix string, logger *mlog.Logger, db *sql.DB, isPlugin bool) (*SQLStore, error) {
 	logger.Info("connectDatabase", mlog.String("dbType", dbType), mlog.String("connStr", connectionString))
-	var err error
-
-	db, err := sql.Open(dbType, connectionString)
-	if err != nil {
-		logger.Error("connectDatabase failed", mlog.Err(err))
-
-		return nil, err
-	}
-
-	err = db.Ping()
-	if err != nil {
-		logger.Error(`Database Ping failed`, mlog.Err(err))
-
-		return nil, err
-	}
-
 	store := &SQLStore{
+		// TODO: add replica DB support too.
 		db:               db,
 		dbType:           dbType,
 		tablePrefix:      tablePrefix,
 		connectionString: connectionString,
 		logger:           logger,
+		isPlugin:         isPlugin,
 	}
 
-	err = store.Migrate()
+	err := store.Migrate()
 	if err != nil {
 		logger.Error(`Table creation / migration failed`, mlog.Err(err))
 
@@ -71,6 +59,13 @@ func (s *SQLStore) Shutdown() error {
 	return s.db.Close()
 }
 
+// DBHandle returns the raw sql.DB handle.
+// It is used by the mattermostauthlayer to run their own
+// raw SQL queries.
+func (s *SQLStore) DBHandle() *sql.DB {
+	return s.db
+}
+
 func (s *SQLStore) getQueryBuilder() sq.StatementBuilderType {
 	builder := sq.StatementBuilder
 	if s.dbType == postgresDBType || s.dbType == sqliteDBType {
@@ -80,7 +75,7 @@ func (s *SQLStore) getQueryBuilder() sq.StatementBuilderType {
 	return builder.RunWith(s.db)
 }
 
-func (s *SQLStore) escapeField(fieldName string) string {
+func (s *SQLStore) escapeField(fieldName string) string { //nolint:unparam
 	if s.dbType == mysqlDBType {
 		return "`" + fieldName + "`"
 	}

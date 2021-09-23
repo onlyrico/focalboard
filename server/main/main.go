@@ -39,7 +39,7 @@ import (
 	"github.com/mattermost/focalboard/server/services/config"
 )
 import (
-	"github.com/mattermost/focalboard/server/services/mlog"
+	"github.com/mattermost/mattermost-server/v6/shared/mlog"
 )
 
 // Active server used with shared code (dll)
@@ -94,16 +94,21 @@ func main() {
 		return
 	}
 
-	logger := mlog.NewLogger()
-	err = logger.Configure(config.LoggingFile, config.LoggingEscapedJson)
+	logger, _ := mlog.NewLogger()
+	cfgJSON := config.LoggingCfgJSON
+	if config.LoggingCfgFile == "" && cfgJSON == "" {
+		// if no logging defined, use default config (console output)
+		cfgJSON = defaultLoggingConfig()
+	}
+	err = logger.Configure(config.LoggingCfgFile, cfgJSON, nil)
 	if err != nil {
 		log.Fatal("Error in config file for logger: ", err)
 		return
 	}
-	defer logger.Shutdown()
+	defer func() { _ = logger.Shutdown() }()
 
 	if logger.HasTargets() {
-		restore := logger.RedirectStdLog(mlog.Info, mlog.String("src", "stdlog"))
+		restore := logger.RedirectStdLog(mlog.LvlInfo, mlog.String("src", "stdlog"))
 		defer restore()
 	}
 
@@ -155,7 +160,19 @@ func main() {
 		config.Port = *pPort
 	}
 
-	server, err := server.New(config, singleUserToken, logger)
+	db, err := server.NewStore(config, logger)
+	if err != nil {
+		logger.Fatal("server.NewStore ERROR", mlog.Err(err))
+	}
+
+	params := server.Params{
+		Cfg:             config,
+		SingleUserToken: singleUserToken,
+		DBStore:         db,
+		Logger:          logger,
+	}
+
+	server, err := server.New(params)
 	if err != nil {
 		logger.Fatal("server.New ERROR", mlog.Err(err))
 	}
@@ -171,7 +188,7 @@ func main() {
 	// Waiting for SIGINT (pkill -2)
 	<-stop
 
-	server.Shutdown()
+	_ = server.Shutdown()
 }
 
 // StartServer starts the server
@@ -205,8 +222,8 @@ func startServer(webPath string, filesPath string, port int, singleUserToken, db
 		return
 	}
 
-	logger := mlog.NewLogger()
-	err = logger.Configure(config.LoggingFile, config.LoggingEscapedJson)
+	logger, _ := mlog.NewLogger()
+	err = logger.Configure(config.LoggingCfgFile, config.LoggingCfgJSON, nil)
 	if err != nil {
 		log.Fatal("Error in config file for logger: ", err)
 		return
@@ -230,7 +247,19 @@ func startServer(webPath string, filesPath string, port int, singleUserToken, db
 		config.DBConfigString = dbConfigString
 	}
 
-	pServer, err = server.New(config, singleUserToken, logger)
+	db, err := server.NewStore(config, logger)
+	if err != nil {
+		logger.Fatal("server.NewStore ERROR", mlog.Err(err))
+	}
+
+	params := server.Params{
+		Cfg:             config,
+		SingleUserToken: singleUserToken,
+		DBStore:         db,
+		Logger:          logger,
+	}
+
+	pServer, err = server.New(params)
 	if err != nil {
 		logger.Fatal("server.New ERROR", mlog.Err(err))
 	}
@@ -249,6 +278,34 @@ func stopServer() {
 	if err != nil {
 		pServer.Logger().Error("server.Shutdown ERROR", mlog.Err(err))
 	}
-	pServer.Logger().Shutdown()
+	_ = pServer.Logger().Shutdown()
 	pServer = nil
+}
+
+func defaultLoggingConfig() string {
+	return `
+	{
+		"def": {
+			"type": "console",
+			"options": {
+				"out": "stdout"
+			},
+			"format": "plain",
+			"format_options": {
+				"delim": " ",
+				"min_level_len": 5,
+				"min_msg_len": 40,
+				"enable_color": true,
+				"enable_caller": true
+			},
+			"levels": [
+				{"id": 5, "name": "debug"},
+				{"id": 4, "name": "info", "color": 36},
+				{"id": 3, "name": "warn"},
+				{"id": 2, "name": "error", "color": 31},
+				{"id": 1, "name": "fatal", "stacktrace": true},
+				{"id": 0, "name": "panic", "stacktrace": true}
+			]
+		}
+	}`
 }

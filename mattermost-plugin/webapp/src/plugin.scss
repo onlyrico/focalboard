@@ -1,0 +1,24 @@
+.channel-header__icon .LogoIcon {
+    height: 24px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+}
+
+.focalboard-body .feature-global-header>header {
+    z-index: 1000;
+
+    .Menu {
+        a, button {
+            color: inherit;
+
+            &:hover {
+                background: rgba(var(--center-channel-color-rgb), 0.08);
+
+                div {
+                    color: var(--link-color-rgb);
+                }
+            }
+        }
+    }
+}

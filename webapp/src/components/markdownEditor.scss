@@ -7,11 +7,20 @@
     .CodeMirror {
         padding: 0;
         min-height: 0;
-        background: var(--main-bg);
-        color: var(--body-color);
+        background: var(--center-channel-bg-rgb);
+        color: var(--center-channel-color-rgb);
     }
 
     pre.CodeMirror-line {
+        padding: 0;
+        word-break: break-word;
+    }
+
+    .CodeMirror-code {
+        line-height: 24px;
+    }
+
+    .CodeMirror-lines {
         padding: 0;
     }
 
@@ -20,7 +29,7 @@
         flex: 1;
         min-height: 0;
         line-height: 1.3;
-        border: none;
+        border: 0;
     }
 
     .CodeMirror-cursor {
@@ -44,6 +53,7 @@
         p {
             margin: 0;
             min-height: 32px;
+            word-break: break-word;
         }
     }
 

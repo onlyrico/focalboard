@@ -1,17 +1,16 @@
 package app
 
 import (
-	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/mattermost/focalboard/server/services/mlog"
 	"github.com/mattermost/focalboard/server/utils"
 
-	"github.com/mattermost/mattermost-server/v5/shared/filestore"
+	"github.com/mattermost/mattermost-server/v6/shared/mlog"
+
+	"github.com/mattermost/mattermost-server/v6/shared/filestore"
 )
 
 func (a *App) SaveFile(reader io.Reader, workspaceID, rootID, filename string) (string, error) {
@@ -26,7 +25,7 @@ func (a *App) SaveFile(reader io.Reader, workspaceID, rootID, filename string) (
 
 	_, appErr := a.filesBackend.WriteFile(reader, filePath)
 	if appErr != nil {
-		return "", errors.New("unable to store the file in the files storage")
+		return "", fmt.Errorf("unable to store the file in the files storage: %w", appErr)
 	}
 
 	return createdFilename, nil
@@ -40,16 +39,23 @@ func (a *App) GetFileReader(workspaceID, rootID, filename string) (filestore.Rea
 	}
 	// FIXUP: Check the deprecated old location
 	if workspaceID == "0" && !exists {
-		oldExists, err := a.filesBackend.FileExists(filename)
-		if err != nil {
-			return nil, err
+		oldExists, err2 := a.filesBackend.FileExists(filename)
+		if err2 != nil {
+			return nil, err2
 		}
 		if oldExists {
-			err := a.filesBackend.MoveFile(filename, filePath)
-			if err != nil {
-				a.logger.Error("ERROR moving file", mlog.String("old", filename), mlog.String("new", filePath))
+			err2 := a.filesBackend.MoveFile(filename, filePath)
+			if err2 != nil {
+				a.logger.Error("ERROR moving file",
+					mlog.String("old", filename),
+					mlog.String("new", filePath),
+					mlog.Err(err2),
+				)
 			} else {
-				a.logger.Debug("Moved file", mlog.String("old", filename), mlog.String("new", filePath))
+				a.logger.Debug("Moved file",
+					mlog.String("old", filename),
+					mlog.String("new", filePath),
+				)
 			}
 		}
 	}
@@ -60,9 +66,4 @@ func (a *App) GetFileReader(workspaceID, rootID, filename string) (filestore.Rea
 	}
 
 	return reader, nil
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
 }

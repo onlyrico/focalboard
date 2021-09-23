@@ -11,6 +11,8 @@ import (
 	"github.com/mattermost/focalboard/server/server"
 	"github.com/mattermost/focalboard/server/services/config"
 	"github.com/webview/webview"
+
+	"github.com/mattermost/mattermost-server/v6/shared/mlog"
 )
 
 var sessionToken string = "su-" + uuid.New().String()
@@ -30,7 +32,9 @@ func getFreePort() (int, error) {
 }
 
 func runServer(port int) (*server.Server, error) {
-	server, err := server.New(&config.Configuration{
+	logger, _ := mlog.NewLogger()
+
+	config := &config.Configuration{
 		ServerRoot:              fmt.Sprintf("http://localhost:%d", port),
 		Port:                    port,
 		DBType:                  "sqlite3",
@@ -48,7 +52,25 @@ func runServer(port int) (*server.Server, error) {
 		EnableLocalMode:         false,
 		LocalModeSocketLocation: "",
 		AuthMode:                "native",
-	}, sessionToken)
+	}
+
+	db, err := server.NewStore(config, logger)
+	if err != nil {
+		fmt.Println("ERROR INITIALIZING THE SERVER STORE", err)
+		return nil, err
+	}
+
+	params := server.Params{
+		Cfg:             config,
+		SingleUserToken: sessionToken,
+		DBStore:         db,
+		Logger:          logger,
+		ServerID:        "",
+		WSAdapter:       nil,
+		NotifyBackends:  nil,
+	}
+
+	server, err := server.New(params)
 	if err != nil {
 		fmt.Println("ERROR INITIALIZING THE SERVER", err)
 		return nil, err

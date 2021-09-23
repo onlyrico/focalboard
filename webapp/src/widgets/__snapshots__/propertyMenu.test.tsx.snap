@@ -68,7 +68,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   class="MenuOption MenuSeparator menu-separator"
                 />
                 <div
+                  aria-label="Text"
                   class="MenuOption TextOption menu-option"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -83,7 +85,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   />
                 </div>
                 <div
+                  aria-label="Number"
                   class="MenuOption TextOption menu-option"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -98,7 +102,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   />
                 </div>
                 <div
+                  aria-label="Email"
                   class="MenuOption TextOption menu-option"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -113,7 +119,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   />
                 </div>
                 <div
+                  aria-label="Phone"
                   class="MenuOption TextOption menu-option"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -128,7 +136,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   />
                 </div>
                 <div
+                  aria-label="URL"
                   class="MenuOption TextOption menu-option"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -143,7 +153,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   />
                 </div>
                 <div
+                  aria-label="Select"
                   class="MenuOption TextOption menu-option"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -158,7 +170,26 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   />
                 </div>
                 <div
+                  aria-label="Multi Select"
                   class="MenuOption TextOption menu-option"
+                  role="button"
+                >
+                  <div
+                    class="noicon"
+                  />
+                  <div
+                    class="menu-name"
+                  >
+                    Multi Select
+                  </div>
+                  <div
+                    class="noicon"
+                  />
+                </div>
+                <div
+                  aria-label="Date"
+                  class="MenuOption TextOption menu-option"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -173,7 +204,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   />
                 </div>
                 <div
+                  aria-label="Person"
                   class="MenuOption TextOption menu-option"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -181,14 +214,16 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   <div
                     class="menu-name"
                   >
-                    Created Time
+                    Person
                   </div>
                   <div
                     class="noicon"
                   />
                 </div>
                 <div
+                  aria-label="Checkbox"
                   class="MenuOption TextOption menu-option"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -196,7 +231,75 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                   <div
                     class="menu-name"
                   >
-                    Updated Time
+                    Checkbox
+                  </div>
+                  <div
+                    class="noicon"
+                  />
+                </div>
+                <div
+                  aria-label="Created time"
+                  class="MenuOption TextOption menu-option"
+                  role="button"
+                >
+                  <div
+                    class="noicon"
+                  />
+                  <div
+                    class="menu-name"
+                  >
+                    Created time
+                  </div>
+                  <div
+                    class="noicon"
+                  />
+                </div>
+                <div
+                  aria-label="Created by"
+                  class="MenuOption TextOption menu-option"
+                  role="button"
+                >
+                  <div
+                    class="noicon"
+                  />
+                  <div
+                    class="menu-name"
+                  >
+                    Created by
+                  </div>
+                  <div
+                    class="noicon"
+                  />
+                </div>
+                <div
+                  aria-label="Last updated time"
+                  class="MenuOption TextOption menu-option"
+                  role="button"
+                >
+                  <div
+                    class="noicon"
+                  />
+                  <div
+                    class="menu-name"
+                  >
+                    Last updated time
+                  </div>
+                  <div
+                    class="noicon"
+                  />
+                </div>
+                <div
+                  aria-label="Last updated by"
+                  class="MenuOption TextOption menu-option"
+                  role="button"
+                >
+                  <div
+                    class="noicon"
+                  />
+                  <div
+                    class="menu-name"
+                  >
+                    Last updated by
                   </div>
                   <div
                     class="noicon"
@@ -210,7 +313,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
                 class="menu-options hideOnWidescreen"
               >
                 <div
+                  aria-label="Cancel"
                   class="MenuOption TextOption menu-option menu-cancel"
+                  role="button"
                 >
                   <div
                     class="noicon"
@@ -229,7 +334,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
           </div>
         </div>
         <div
+          aria-label="Delete"
           class="MenuOption TextOption menu-option"
+          role="button"
         >
           <div
             class="noicon"
@@ -251,7 +358,9 @@ exports[`widgets/PropertyMenu should match snapshot 1`] = `
         class="menu-options hideOnWidescreen"
       >
         <div
+          aria-label="Cancel"
           class="MenuOption TextOption menu-option menu-cancel"
+          role="button"
         >
           <div
             class="noicon"

@@ -2,10 +2,12 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/mattermost/focalboard/server/model"
-	"github.com/mattermost/focalboard/server/services/mlog"
 	"github.com/mattermost/focalboard/server/utils"
+
+	"github.com/mattermost/mattermost-server/v6/shared/mlog"
 )
 
 func (a *App) GetRootWorkspace() (*model.Workspace, error) {
@@ -33,9 +35,9 @@ func (a *App) GetRootWorkspace() (*model.Workspace, error) {
 	return workspace, nil
 }
 
-func (a *App) GetWorkspace(ID string) (*model.Workspace, error) {
-	workspace, err := a.store.GetWorkspace(ID)
-	if err == sql.ErrNoRows {
+func (a *App) GetWorkspace(id string) (*model.Workspace, error) {
+	workspace, err := a.store.GetWorkspace(id)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -54,4 +56,12 @@ func (a *App) UpsertWorkspaceSettings(workspace model.Workspace) error {
 
 func (a *App) UpsertWorkspaceSignupToken(workspace model.Workspace) error {
 	return a.store.UpsertWorkspaceSignupToken(workspace)
+}
+
+func (a *App) GetWorkspaceCount() (int64, error) {
+	return a.store.GetWorkspaceCount()
+}
+
+func (a *App) GetUserWorkspaces(userID string) ([]model.UserWorkspace, error) {
+	return a.store.GetUserWorkspaces(userID)
 }

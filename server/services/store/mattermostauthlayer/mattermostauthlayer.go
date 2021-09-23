@@ -3,65 +3,63 @@ package mattermostauthlayer
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
-	"log"
+	"fmt"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	sq "github.com/Masterminds/squirrel"
 
 	"github.com/mattermost/focalboard/server/model"
 	"github.com/mattermost/focalboard/server/services/store"
+
+	"github.com/mattermost/mattermost-server/v6/shared/mlog"
 )
 
 const (
-	mysqlDBType    = "mysql"
 	sqliteDBType   = "sqlite3"
 	postgresDBType = "postgres"
+	mysqlDBType    = "mysql"
+
+	directChannelType = "D"
 )
+
+var (
+	errUnsupportedDatabaseError = errors.New("method is unsupported on current database. Supported databases are - MySQL and PostgreSQL")
+)
+
+type NotSupportedError struct {
+	msg string
+}
+
+func (pe NotSupportedError) Error() string {
+	return pe.msg
+}
 
 // Store represents the abstraction of the data storage.
 type MattermostAuthLayer struct {
 	store.Store
 	dbType string
 	mmDB   *sql.DB
+	logger *mlog.Logger
 }
 
 // New creates a new SQL implementation of the store.
-func New(dbType, connectionString string, store store.Store) (*MattermostAuthLayer, error) {
-	log.Println("connectDatabase", dbType, connectionString)
-	var err error
-
-	db, err := sql.Open(dbType, connectionString)
-	if err != nil {
-		log.Print("connectDatabase: ", err)
-
-		return nil, err
-	}
-
-	err = db.Ping()
-	if err != nil {
-		log.Printf(`Database Ping failed: %v`, err)
-
-		return nil, err
-	}
-
+func New(dbType string, db *sql.DB, store store.Store, logger *mlog.Logger) (*MattermostAuthLayer, error) {
 	layer := &MattermostAuthLayer{
 		Store:  store,
 		dbType: dbType,
 		mmDB:   db,
+		logger: logger,
 	}
 
 	return layer, nil
 }
 
 // Shutdown close the connection with the store.
-func (l *MattermostAuthLayer) Shutdown() error {
-	err := l.Store.Shutdown()
-	if err != nil {
-		return err
-	}
-	return l.mmDB.Close()
+func (s *MattermostAuthLayer) Shutdown() error {
+	return s.Store.Shutdown()
 }
 
 func (s *MattermostAuthLayer) GetRegisteredUserCount() (int, error) {
@@ -81,29 +79,56 @@ func (s *MattermostAuthLayer) GetRegisteredUserCount() (int, error) {
 }
 
 func (s *MattermostAuthLayer) getUserByCondition(condition sq.Eq) (*model.User, error) {
+	users, err := s.getUsersByCondition(condition)
+	if err != nil {
+		return nil, err
+	}
+
+	var user *model.User
+	for _, u := range users {
+		user = u
+		break
+	}
+
+	return user, nil
+}
+
+func (s *MattermostAuthLayer) getUsersByCondition(condition sq.Eq) (map[string]*model.User, error) {
 	query := s.getQueryBuilder().
-		Select("id", "username", "email", "password", "MFASecret as mfa_secret", "AuthService as auth_service", "COALESCE(AuthData, '') as auth_data", "props", "CreateAt as create_at", "UpdateAt as update_at", "DeleteAt as delete_at").
+		Select("id", "username", "email", "password", "MFASecret as mfa_secret", "AuthService as auth_service", "COALESCE(AuthData, '') as auth_data",
+			"props", "CreateAt as create_at", "UpdateAt as update_at", "DeleteAt as delete_at").
 		From("Users").
 		Where(sq.Eq{"deleteAt": 0}).
 		Where(condition)
-	row := query.QueryRow()
-	user := model.User{}
-
-	var propsBytes []byte
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.MfaSecret, &user.AuthService, &user.AuthData, &propsBytes, &user.CreateAt, &user.UpdateAt, &user.DeleteAt)
+	row, err := query.Query()
 	if err != nil {
 		return nil, err
 	}
 
-	err = json.Unmarshal(propsBytes, &user.Props)
-	if err != nil {
-		return nil, err
+	users := map[string]*model.User{}
+
+	for row.Next() {
+		user := model.User{}
+
+		var propsBytes []byte
+		err := row.Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.MfaSecret, &user.AuthService,
+			&user.AuthData, &propsBytes, &user.CreateAt, &user.UpdateAt, &user.DeleteAt)
+		if err != nil {
+			return nil, err
+		}
+
+		err = json.Unmarshal(propsBytes, &user.Props)
+		if err != nil {
+			return nil, err
+		}
+
+		users[user.ID] = &user
 	}
 
-	return &user, nil
+	return users, nil
 }
 
-func (s *MattermostAuthLayer) GetUserById(userID string) (*model.User, error) {
+func (s *MattermostAuthLayer) GetUserByID(userID string) (*model.User, error) {
 	return s.getUserByCondition(sq.Eq{"id": userID})
 }
 
@@ -116,22 +141,22 @@ func (s *MattermostAuthLayer) GetUserByUsername(username string) (*model.User, e
 }
 
 func (s *MattermostAuthLayer) CreateUser(user *model.User) error {
-	return errors.New("no user creation allowed from focalboard, create it using mattermost")
+	return NotSupportedError{"no user creation allowed from focalboard, create it using mattermost"}
 }
 
 func (s *MattermostAuthLayer) UpdateUser(user *model.User) error {
-	return errors.New("no update allowed from focalboard, update it using mattermost")
+	return NotSupportedError{"no update allowed from focalboard, update it using mattermost"}
 }
 
 func (s *MattermostAuthLayer) UpdateUserPassword(username, password string) error {
-	return errors.New("no update allowed from focalboard, update it using mattermost")
+	return NotSupportedError{"no update allowed from focalboard, update it using mattermost"}
 }
 
 func (s *MattermostAuthLayer) UpdateUserPasswordByID(userID, password string) error {
-	return errors.New("no update allowed from focalboard, update it using mattermost")
+	return NotSupportedError{"no update allowed from focalboard, update it using mattermost"}
 }
 
-// GetActiveUserCount returns the number of users with active sessions within N seconds ago
+// GetActiveUserCount returns the number of users with active sessions within N seconds ago.
 func (s *MattermostAuthLayer) GetActiveUserCount(updatedSecondsAgo int64) (int, error) {
 	query := s.getQueryBuilder().
 		Select("count(distinct userId)").
@@ -150,33 +175,33 @@ func (s *MattermostAuthLayer) GetActiveUserCount(updatedSecondsAgo int64) (int, 
 }
 
 func (s *MattermostAuthLayer) GetSession(token string, expireTime int64) (*model.Session, error) {
-	return nil, errors.New("sessions not used when using mattermost")
+	return nil, NotSupportedError{"sessions not used when using mattermost"}
 }
 
 func (s *MattermostAuthLayer) CreateSession(session *model.Session) error {
-	return errors.New("no update allowed from focalboard, update it using mattermost")
+	return NotSupportedError{"no update allowed from focalboard, update it using mattermost"}
 }
 
 func (s *MattermostAuthLayer) RefreshSession(session *model.Session) error {
-	return errors.New("no update allowed from focalboard, update it using mattermost")
+	return NotSupportedError{"no update allowed from focalboard, update it using mattermost"}
 }
 
 func (s *MattermostAuthLayer) UpdateSession(session *model.Session) error {
-	return errors.New("no update allowed from focalboard, update it using mattermost")
+	return NotSupportedError{"no update allowed from focalboard, update it using mattermost"}
 }
 
-func (s *MattermostAuthLayer) DeleteSession(sessionId string) error {
-	return errors.New("no update allowed from focalboard, update it using mattermost")
+func (s *MattermostAuthLayer) DeleteSession(sessionID string) error {
+	return NotSupportedError{"no update allowed from focalboard, update it using mattermost"}
 }
 
 func (s *MattermostAuthLayer) CleanUpSessions(expireTime int64) error {
-	return errors.New("no update allowed from focalboard, update it using mattermost")
+	return NotSupportedError{"no update allowed from focalboard, update it using mattermost"}
 }
 
-func (s *MattermostAuthLayer) GetWorkspace(ID string) (*model.Workspace, error) {
-	if ID == "0" {
+func (s *MattermostAuthLayer) GetWorkspace(id string) (*model.Workspace, error) {
+	if id == "0" {
 		workspace := model.Workspace{
-			ID:    ID,
+			ID:    id,
 			Title: "",
 		}
 
@@ -186,7 +211,7 @@ func (s *MattermostAuthLayer) GetWorkspace(ID string) (*model.Workspace, error) 
 	query := s.getQueryBuilder().
 		Select("DisplayName, Type").
 		From("Channels").
-		Where(sq.Eq{"ID": ID})
+		Where(sq.Eq{"ID": id})
 
 	row := query.QueryRow()
 	var displayName string
@@ -197,33 +222,36 @@ func (s *MattermostAuthLayer) GetWorkspace(ID string) (*model.Workspace, error) 
 	}
 
 	if channelType != "D" && channelType != "G" {
-		return &model.Workspace{ID: ID, Title: displayName}, nil
+		return &model.Workspace{ID: id, Title: displayName}, nil
 	}
 
 	query = s.getQueryBuilder().
 		Select("Username").
 		From("ChannelMembers").
 		Join("Users ON Users.ID=ChannelMembers.UserID").
-		Where(sq.Eq{"ChannelID": ID})
+		Where(sq.Eq{"ChannelID": id})
 
 	var sb strings.Builder
 	rows, err := query.Query()
 	if err != nil {
 		return nil, err
 	}
+	defer s.CloseRows(rows)
+
 	first := true
 	for rows.Next() {
 		if first {
-			sb.WriteString(", ")
 			first = false
+		} else {
+			sb.WriteString(", ")
 		}
 		var name string
 		if err := rows.Scan(&name); err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		sb.WriteString(name)
 	}
-	return &model.Workspace{ID: ID, Title: sb.String()}, nil
+	return &model.Workspace{ID: id, Title: sb.String()}, nil
 }
 
 func (s *MattermostAuthLayer) HasWorkspaceAccess(userID string, workspaceID string) (bool, error) {
@@ -251,4 +279,177 @@ func (s *MattermostAuthLayer) getQueryBuilder() sq.StatementBuilderType {
 	}
 
 	return builder.RunWith(s.mmDB)
+}
+
+func (s *MattermostAuthLayer) GetUsersByWorkspace(workspaceID string) ([]*model.User, error) {
+	query := s.getQueryBuilder().
+		Select("id", "username", "email", "password", "MFASecret as mfa_secret", "AuthService as auth_service", "COALESCE(AuthData, '') as auth_data",
+			"props", "CreateAt as create_at", "UpdateAt as update_at", "DeleteAt as delete_at").
+		From("Users").
+		Join("ChannelMembers ON ChannelMembers.UserID = Users.ID").
+		Where(sq.Eq{"deleteAt": 0}).
+		Where(sq.Eq{"ChannelMembers.ChannelId": workspaceID})
+
+	rows, err := query.Query()
+	if err != nil {
+		return nil, err
+	}
+	defer s.CloseRows(rows)
+
+	users, err := s.usersFromRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (s *MattermostAuthLayer) usersFromRows(rows *sql.Rows) ([]*model.User, error) {
+	users := []*model.User{}
+
+	for rows.Next() {
+		var user model.User
+		var propsBytes []byte
+
+		err := rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.Password,
+			&user.MfaSecret,
+			&user.AuthService,
+			&user.AuthData,
+			&propsBytes,
+			&user.CreateAt,
+			&user.UpdateAt,
+			&user.DeleteAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		err = json.Unmarshal(propsBytes, &user.Props)
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, &user)
+	}
+
+	return users, nil
+}
+
+func (s *MattermostAuthLayer) CloseRows(rows *sql.Rows) {
+	if err := rows.Close(); err != nil {
+		s.logger.Error("error closing MattermostAuthLayer row set", mlog.Err(err))
+	}
+}
+
+func (s *MattermostAuthLayer) GetUserWorkspaces(userID string) ([]model.UserWorkspace, error) {
+	var query sq.SelectBuilder
+
+	var nonTemplateFilter string
+
+	switch s.dbType {
+	case mysqlDBType:
+		nonTemplateFilter = "focalboard_blocks.fields LIKE '%\"isTemplate\":false%'"
+	case postgresDBType:
+		nonTemplateFilter = "focalboard_blocks.fields ->> 'isTemplate' = 'false'"
+	default:
+		return nil, fmt.Errorf("GetUserWorkspaces - %w", errUnsupportedDatabaseError)
+	}
+
+	query = s.getQueryBuilder().
+		Select("Channels.ID", "Channels.DisplayName", "COUNT(focalboard_blocks.id), Channels.Type, Channels.Name").
+		From("ChannelMembers").
+		// select channels without a corresponding workspace
+		LeftJoin(
+			"focalboard_blocks ON focalboard_blocks.workspace_id = ChannelMembers.ChannelId AND "+
+				"focalboard_blocks.type = 'board' AND "+
+				nonTemplateFilter,
+		).
+		Join("Channels ON ChannelMembers.ChannelId = Channels.Id").
+		Where(sq.Eq{"ChannelMembers.UserId": userID}).
+		GroupBy("Channels.Id", "Channels.DisplayName")
+
+	rows, err := query.Query()
+	if err != nil {
+		s.logger.Error("ERROR GetUserWorkspaces", mlog.Err(err))
+		return nil, err
+	}
+
+	defer s.CloseRows(rows)
+	return s.userWorkspacesFromRows(rows)
+}
+
+type UserWorkspaceRawModel struct {
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	BoardCount int    `json:"boardCount"`
+	Type       string `json:"type"`
+	Name       string `json:"name"`
+}
+
+func (s *MattermostAuthLayer) userWorkspacesFromRows(rows *sql.Rows) ([]model.UserWorkspace, error) {
+	rawUserWorkspaces := []UserWorkspaceRawModel{}
+	usersToFetch := []string{}
+
+	for rows.Next() {
+		var rawUserWorkspace UserWorkspaceRawModel
+
+		err := rows.Scan(
+			&rawUserWorkspace.ID,
+			&rawUserWorkspace.Title,
+			&rawUserWorkspace.BoardCount,
+			&rawUserWorkspace.Type,
+			&rawUserWorkspace.Name,
+		)
+
+		if err != nil {
+			s.logger.Error("ERROR userWorkspacesFromRows", mlog.Err(err))
+			return nil, err
+		}
+
+		if rawUserWorkspace.Type == directChannelType {
+			userIDs := strings.Split(rawUserWorkspace.Name, "__")
+			usersToFetch = append(usersToFetch, userIDs...)
+		}
+
+		rawUserWorkspaces = append(rawUserWorkspaces, rawUserWorkspace)
+	}
+
+	var users map[string]*model.User
+
+	if len(usersToFetch) > 0 {
+		var err error
+		users, err = s.getUsersByCondition(sq.Eq{"id": usersToFetch})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	userWorkspaces := []model.UserWorkspace{}
+
+	for i := range rawUserWorkspaces {
+		if rawUserWorkspaces[i].Type == directChannelType {
+			userIDs := strings.Split(rawUserWorkspaces[i].Name, "__")
+			names := []string{}
+
+			for _, userID := range userIDs {
+				names = append(names, users[userID].Username)
+			}
+
+			rawUserWorkspaces[i].Title = strings.Join(names, ", ")
+		}
+
+		userWorkspace := model.UserWorkspace{
+			ID:         rawUserWorkspaces[i].ID,
+			Title:      rawUserWorkspaces[i].Title,
+			BoardCount: rawUserWorkspaces[i].BoardCount,
+		}
+
+		userWorkspaces = append(userWorkspaces, userWorkspace)
+	}
+
+	return userWorkspaces, nil
 }
